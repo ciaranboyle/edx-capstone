@@ -1,0 +1,1068 @@
+---
+title: "Orthopedic Patients Prediction Models - Report"
+author: "Ciaran Boyle"
+date: "11/05/2020"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+header-includes:
+  - \usepackage[default]{sourcesanspro}
+  - \usepackage[T1]{fontenc}
+  - \usepackage{leading}
+  - \leading{15pt}
+
+mainfont: SourceSansPro
+geometry: margin=2.25cm
+fontsize: 10pt
+---
+
+\renewcommand{\arraystretch}{1.25}
+```{r setup, include=FALSE}
+#libraries
+knitr::opts_chunk$set(echo = TRUE, tidy = FALSE)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+library(caret)
+library(lubridate)
+library(ggpubr)
+library(formattable)
+library(kableExtra)
+library(rpart)
+
+# load rdata file from github
+load(file = url("https://github.com/ciaranboyle/edx-capstone/blob/main/REPORT_WORKPLACE%2020201103%2001.RData?raw=true"))
+```
+
+
+\newpage
+
+## 1 - Introduction
+### 1.1 - Description of the Orthopedic Dataset
+The data observed was a dataset of "Biomechanical features of orthopedic patients". It was initially compiled by M. Lichman, from the University of California, in 2013. The dataset was downloaded from kaggle at the following link: *https://www.kaggle.com/uciml/biomechanical-features-of-orthopedic-patients*.^[Kaggle, (2017), Biomechanical features of orthopedic patients? (https://www.kaggle.com/uciml/biomechanical-features-of-orthopedic-patients)]  
+
+The dataset contained 310 different patients (observations), with each patient having six different biomechanical features, and a single feature regarding the classification of their spinal condition.^[Kaggle, (2017), Biomechanical features of orthopedic patients? (https://www.kaggle.com/uciml/biomechanical-features-of-orthopedic-patients)] 
+
+<br />
+
+### 1.2 - Goal of the Project
+The main goal of this project was to apply various different algorithms on the orthopedic dataset, to examine the different accuracies each of the algorithms produces, and to select the one that produces the highest accuracy.
+
+The accuracy of each algorithm was assessed by using the trained algorithm on the test set, and calculating the number of correct predictions over the number of all predictions.
+
+<br />
+
+### 1.3 - Key steps taken
+Following the generation of the training and test datasets, visualization techniques were performed to understand the nature of the different features contained within the datasets. This analysis helped determine the starting point for the development of the prediction model.  
+
+Simple models were initially used to classify the patients, with increasingly complex models being used to see if they produced more accurate sets of predictions.
+
+<br />
+<br />
+
+\newpage
+## 2. Methods/Analysis
+### 2.1 - Data Preparation
+Before downloading the data, it was crucial that the proper packages were installed and loaded.
+```{r , eval=FALSE}
+##########################################################
+# Install and load rpackages
+##########################################################
+if (!require("tidyverse")) {
+  install.packages("tidyverse")
+  library(tidyverse)
+}
+if (!require("caret")) {
+  install.packages("caret")
+  library(caret)
+}
+if (!require("data.table")) {
+  install.packages("data.table")
+  library(data.table)
+}
+if (!require("dplyr")) {
+  install.packages("dplyr")
+  library(dplyr)
+}
+if (!require("readr")) {
+  install.packages("readr")
+  library(readr)
+}
+if (!require("ggplot2")) {
+  install.packages("ggplot2")
+  library(ggplot2)
+}
+if (!require("klaR")) {
+  install.packages("klaR")
+  library(klaR)
+}
+if (!require("randomForest")){
+  install.packages("randomForest")
+  library(randomForest)
+}
+if (!require("gam")){
+  install.packages("gam")
+  library(gam)
+}
+if (!require("gmodels")){
+  install.packages("gmodels")
+  library(gmodels)
+}
+if (!require("gridExtra")){
+  install.packages("gridExtra")
+  library(gridExtra)
+}
+if (!require("cowplot")){
+  install.packages("cowplot")
+  library(cowplot)
+}
+if (!require("rlang")){
+  install.packages("rlang")
+  library(rlang)
+}
+if (!require("ggpubr")){
+  install.packages("ggpubr")
+  library(ggpubr)
+}
+
+```
+
+Once the appropriate packages had been loaded, the downloading of the orthopedic dataset was begun. The data was downloaded using the code below:
+<!-- Code chunk: for downloading edx data -->
+```{r , eval=FALSE}
+##########################################################
+# Generate bio dataset
+##########################################################
+# Biomechanical features of orthopedic patients dataset:
+# Original Link: https://www.kaggle.com/uciml/biomechanical-features-of-orthopedic-patients
+# Github Link: https://raw.githubusercontent.com/ciaranboyle/edx-capstone/main/orthopedic_data.csv
+
+orthopedic_data <- 
+  read_csv(url("https://raw.githubusercontent.com/ciaranboyle/edx-capstone/main/orthopedic_data.csv"))
+``` 
+
+The downloaded data was stored in a data table named **orthopedic_data**, and split into two separate sets of data: **orthopedic_training** and **orthopedic_test**. **Orthopedic_training** was used to develop various prediction models, which were then tested on the test **orthopedic_test**. The accuracy of each prediction model was then assessed and recorded.
+
+<!-- Code chunk: for generating test and training sets -->
+```{r, eval=FALSE}
+##########################################################
+# Generate Training and Test Datasets
+##########################################################
+#generate training and test sets
+set.seed(28, sample.kind="Rounding")
+partition_index <- createDataPartition(y = orthopedic_data$class, 
+                                       times = 1, p = 0.7, list=FALSE)
+orthopedic_training <- orthopedic_data[partition_index,]
+orthopedic_test <- orthopedic_data[-partition_index,]
+
+# Clean up environment
+rm(partition_index)
+```
+
+A 70%/30% training/test split was chosen, due to it being considered the standard for algorithm training.
+
+<br />
+
+### 2.2 - Data Exploration and Visualization
+
+Once the training and test sets were generated, the **orthopedic_data** dataset was examined more thoroughly. The first thing to do was to examine the different features of each observation.
+
+<!-- Code chunk: for viewing edx data structure -->
+```{r}
+str(orthopedic_data, give.attr = FALSE)
+```
+Using the code above, seven distinct features were identified. A more indepth outline of the different features is located below.
+
+<!-- Code chunk: for creating the description table -->
+```{r, echo=FALSE}
+library(knitr)
+require(knitr)
+df <- data.frame("Feature Name" = c("pelvic_incidence", "pelvic_tilt" , "lumbar_lordosis_angle", "sacral_slope", "pelvic_radius", "degree_spondylolisthesis", "class"), 
+           "Object Class" = c("numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "character"),
+           "Short Description" = c("Angle between sacral plate and femoral heads axis", "Position of pelvis", "Inward curve of lumbar spine", "Angle between the horizontal and the sacral plate", "Distance from the hip axis to the back of the neck", "Severity of Spondylolisthesis", "Bone Condition Class"))
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Description Summary of Orthopedic Features") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+<br /><br />
+\newpage
+
+### 2.2.1 - Patients per Bone Class
+One of the first things examined within the dataset was the number of patients per bone class.
+
+<!-- Code chunk: Number of patients per bone class -->
+```{r, eval=FALSE}
+##########################################################
+# Calculate patients per bone class
+##########################################################
+orthopedic_data %>% group_by(class) %>% summarize(Count = n())
+```
+
+<!-- Code chunk: Number of patients per bone class (table) -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+df <- orthopedic_data %>% group_by(class) %>% summarize(Count = n())
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Number of Patients per Bone Class") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+<br />
+From this table, it can be concluded that there are three seperate classes: **Normal**, **Hernia**, and **Spondylolisthesis.** The number of patients with the **Normal** bone class is almost double the number of patients classified under the **Hernia** bone class. **Spondylolisthesis** is the largest bone class, with nearly half of its patients making up the entire dataset.
+
+<br />
+
+\newpage
+### 2.2.2 - Distribution of Pelvic incidence per patient
+Beginning with this subsection, the count distribution for each feature (grouped by bone class) was examined. The first feature that was examined was the Pelvic incidence per patient.
+<br /><br />
+
+<!-- Code chunk: Graph -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+orthopedic_data %>% ggplot(aes(pelvic_incidence, fill=class)) + 
+  geom_histogram(color="black") + facet_grid(class ~ .) +
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(title = "Distribution of Pelvic incidence per patient", subtitle = "") +
+  xlab("Pelvic Incidence") +
+  ylab("Count") +
+  scale_x_continuous(breaks=seq(0, 150, 25))
+```
+
+<!-- Code chunk: Summary table -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+df <- tapply(orthopedic_data$pelvic_incidence, 
+             orthopedic_data$class, summary)
+
+df$Normal[["Range"]] <- df$Normal[6] - df$Normal[1]
+df$Hernia[["Range"]] <- df$Hernia[6] - df$Hernia[1]
+df$Spondylolisthesis[["Range"]] <- df$Spondylolisthesis[6] - df$Spondylolisthesis[1]
+df$Normal[["IQR"]] <- df$Normal[5] - df$Normal[2]
+df$Hernia[["IQR"]] <- df$Hernia[5] - df$Hernia[2]
+df$Spondylolisthesis[["IQR"]] <- df$Spondylolisthesis[5] - df$Spondylolisthesis[2]
+
+df
+```
+
+<br />
+
+The distribution for **Normal** patients appears to be bimodal, while the distributions for **Hernia** and **Spondylolisthesis** patients appear to be unimodal. Another thing to note is that the lower and upper limits of pelvic incidence appear to be very similar for both **Normal** and **Hernia**, the only difference being that the **Normal** class has a slightly higher maximum value. In contrast to the two bone classes, **Spondylolisthesis** has a significantly wider range.
+<br />
+
+### 2.2.3 - Distribution of Pelvic tilt per patient
+<br /><br />
+
+<!-- Code chunk: Graph -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+orthopedic_data %>% ggplot(aes(pelvic_tilt, fill=class)) + 
+  geom_histogram(color="black") + facet_grid(class ~ .) +
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(title = "Distribution of Pelvic tilt per patient", subtitle = "") +
+  xlab("Pelvic Tilt") +
+  ylab("Count") +
+  scale_x_continuous(breaks=seq(0, 50, 10))
+```
+
+<!-- Code chunk: Summary table -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+df <- tapply(orthopedic_data$pelvic_tilt, orthopedic_data$class, summary)
+
+df$Normal[["Range"]] <- df$Normal[6] - df$Normal[1]
+df$Hernia[["Range"]] <- df$Hernia[6] - df$Hernia[1]
+df$Spondylolisthesis[["Range"]] <- df$Spondylolisthesis[6] - df$Spondylolisthesis[1]
+df$Normal[["IQR"]] <- df$Normal[5] - df$Normal[2]
+df$Hernia[["IQR"]] <- df$Hernia[5] - df$Hernia[2]
+df$Spondylolisthesis[["IQR"]] <- df$Spondylolisthesis[5] - df$Spondylolisthesis[2]
+
+df
+```
+
+<br />
+
+As for the previous feature, the lower and upper limits appear to be very similar for both **Normal** and **Hernia**, while **Spondylolisthesis** has a significantly wider range. However the lower limit for the **Normal** bone class appears to be slightly lower compared to **Hernia**, while **Hernia's** upper limit appears to be significantly higher.
+<br />
+
+### 2.2.4 - Distribution of Pelvic radius per patient
+<br /><br />
+
+<!-- Code chunk: Graph -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+orthopedic_data %>% ggplot(aes(pelvic_radius, fill=class)) + 
+  geom_histogram(color="black") + facet_grid(class ~ .) +
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(title = "Distribution of Pelvic radius per patient", subtitle = "") +
+  xlab("Pelvic Radius") +
+  ylab("Count") +
+  scale_x_continuous(breaks=seq(0, 200, 25))
+```
+
+<!-- Code chunk: Summary table -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+df <- tapply(orthopedic_data$pelvic_radius, orthopedic_data$class, summary)
+
+df$Normal[["Range"]] <- df$Normal[6] - df$Normal[1]
+df$Hernia[["Range"]] <- df$Hernia[6] - df$Hernia[1]
+df$Spondylolisthesis[["Range"]] <- df$Spondylolisthesis[6] - df$Spondylolisthesis[1]
+df$Normal[["IQR"]] <- df$Normal[5] - df$Normal[2]
+df$Hernia[["IQR"]] <- df$Hernia[5] - df$Hernia[2]
+df$Spondylolisthesis[["IQR"]] <- df$Spondylolisthesis[5] - df$Spondylolisthesis[2]
+
+df
+```
+
+<br />
+
+As for the previous feature, the lower and upper limits appear to be very similar for both **Normal** and **Hernia**, while **Spondylolisthesis** has a significantly wider range. The median for the **Normal** bone class appears to be slightly higher than **Hernia**, and **Hernia's** lower limit is significantly lower than that of the **Normal** bone class.
+<br />
+
+### 2.2.5 - Distribution of Lumbar lordosis angle per patient
+<br /><br />
+
+<!-- Code chunk: Graph -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+orthopedic_data %>% ggplot(aes(lumbar_lordosis_angle, fill=class)) + 
+  geom_histogram(color="black") + facet_grid(class ~ .) +
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(title = "Distribution of Lumbar lordosis angle per patient", subtitle = "") +
+  xlab("Lumbar Lordosis Angle") +
+  ylab("Count") +
+  scale_x_continuous(breaks=seq(0, 150, 25))
+```
+
+<!-- Code chunk: Summary table -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+df <- tapply(orthopedic_data$lumbar_lordosis_angle, orthopedic_data$class, summary)
+
+df$Normal[["Range"]] <- df$Normal[6] - df$Normal[1]
+df$Hernia[["Range"]] <- df$Hernia[6] - df$Hernia[1]
+df$Spondylolisthesis[["Range"]] <- df$Spondylolisthesis[6] - df$Spondylolisthesis[1]
+df$Normal[["IQR"]] <- df$Normal[5] - df$Normal[2]
+df$Hernia[["IQR"]] <- df$Hernia[5] - df$Hernia[2]
+df$Spondylolisthesis[["IQR"]] <- df$Spondylolisthesis[5] - df$Spondylolisthesis[2]
+
+df
+```
+
+<br/>
+
+As for the previous feature, the lower and upper limits appear to be very similar for both **Normal** and **Hernia**, while **Spondylolisthesis** has a significantly wider range. However, the upper limits for the **Normal** bone class appear to be higher compared to **Hernia.** In addition, the median for the normal bone class appears to be slightly higher than **Hernia**, while the median for **Spondylolisthesis** is significantly greater than the medians of the other two classes.
+<br />
+
+### 2.2.6 - Distribution of Sacral slope per patient
+<br /><br />
+
+<!-- Code chunk: Graph -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+orthopedic_data %>% ggplot(aes(sacral_slope, fill=class)) + 
+  geom_histogram(color="black") + facet_grid(class ~ .) +
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(title = "Distribution of Sacral slope per patient", subtitle = "") +
+  xlab("Sacral slope") +
+  ylab("Count") +
+  scale_x_continuous(breaks=seq(0, 200, 25))
+```
+
+<!-- Code chunk: Summary table -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+df <- tapply(orthopedic_data$sacral_slope, orthopedic_data$class, summary)
+
+df$Normal[["Range"]] <- df$Normal[6] - df$Normal[1]
+df$Hernia[["Range"]] <- df$Hernia[6] - df$Hernia[1]
+df$Spondylolisthesis[["Range"]] <- df$Spondylolisthesis[6] - df$Spondylolisthesis[1]
+df$Normal[["IQR"]] <- df$Normal[5] - df$Normal[2]
+df$Hernia[["IQR"]] <- df$Hernia[5] - df$Hernia[2]
+df$Spondylolisthesis[["IQR"]] <- df$Spondylolisthesis[5] - df$Spondylolisthesis[2]
+
+df
+```
+
+<br />
+
+As for the previous feature, the lower and upper limits appear to be very similar for both **Normal** and **Hernia**, while **Spondylolisthesis** has a significantly wider range. However, the upper limits for the **Normal** bone class appear to be higher compared to **Hernia**. In addition, the median for the **Normal** bone class appears to be slightly higher than the median for **Hernia**, 
+<br />
+
+### 2.2.7 - Distribution of Degree spondylolisthesis per patient
+<br /><br />
+
+<!-- Code chunk: Graph -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+orthopedic_data %>% ggplot(aes(degree_spondylolisthesis, fill=class)) + 
+  geom_histogram(color="black") + facet_grid(class ~ .) +
+  theme(axis.text.x = element_text(angle = 90)) + 
+  labs(title = "Distribution of Degree spondylolisthesis per patient", subtitle = "") +
+  xlab("Degree Spondylolisthesis") +
+  ylab("Count") +
+  scale_x_continuous(breaks=seq(0, 500, 100))
+```
+
+<!-- Code chunk: Summary table -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+df <- tapply(orthopedic_data$degree_spondylolisthesis, orthopedic_data$class, summary)
+
+df$Normal[["Range"]] <- df$Normal[6] - df$Normal[1]
+df$Hernia[["Range"]] <- df$Hernia[6] - df$Hernia[1]
+df$Spondylolisthesis[["Range"]] <- df$Spondylolisthesis[6] - df$Spondylolisthesis[1]
+df$Normal[["IQR"]] <- df$Normal[5] - df$Normal[2]
+df$Hernia[["IQR"]] <- df$Hernia[5] - df$Hernia[2]
+df$Spondylolisthesis[["IQR"]] <- df$Spondylolisthesis[5] - df$Spondylolisthesis[2]
+
+df
+```
+
+Similar to the previous feature, the lower and upper limits appear to be very similar for both **Normal** and **Hernia**, while **Spondylolisthesis** has a significantly wider range. In fact, the **Spondylolisthesis** bone class appears to have a patient with a degree spondlolisthesis of approximately 418. However, even without this observation, the **Spondylolisthesis** class would still have a significantly wider range.
+<br />
+
+### 2.3 - Table & Chart Conclusions
+The **Normal** and **Hernia** bone classes appear to have a lot of overlap regarding the distribution of features. The two aforementioned classes appear to have very similar interquartile ranges (IQRs), for almost (if not all) of the six numerical features. While the **Spondylolisthesis** bone class does overlap the distribution of the other two classes, its distribution is wider in most of the features. These insights suggest it is likely that **Normal** and **Hernia** bone classes will be incorrectly classified as one another more frequently compared to the **Spondylolisthesis** bone class.
+<br />
+<br />
+
+\newpage
+
+## 3. Results
+
+### 3.1 - Developing the machine learning algorithms
+
+Once the data was examined, modelling & optimization of the model began. The accuracy of each algorithm was assessed by calculating the number of correct predictions, divided by the number of all predictions (in the test set).
+
+<br />
+
+### 3.2 - Prediction Models
+A large variety of different prediction models were created. The first of which was relatively simple, with the subsequent models becoming increasingly complex
+<br />
+
+### 3.2.1 - Linear Discriminant Analysis (LDA)
+The main goal of LDA is to "project the features in a higher dimension space onto a lower dimension space". This was achieved in three steps:^[Sawla, S. (2018), Linear Discriminant Analysis. https://medium.com/@srishtisawla/linear-discriminant-analysis-d38decf48105]
+
+
+1. The first step is to calculate the between-class variance (i.e.: the distance between the mean of different classes).
+
+2. The second step is to calcualte the within-class variance (i.e.: the distance between the mean and sample of each class).
+
+3. The third step is to construct the lower dimensional space which maximizes the between class variance and minimizes the within class variance.
+
+<br />
+
+The accuracy of the LDA algorithm was assessed as shown below:
+```{r, warning=FALSE, message=FALSE}
+##########################################################
+# LDA
+##########################################################
+set.seed(28, sample.kind="Rounding")
+
+#running the LDA algorithm
+train_lda <- train(class ~ ., 
+                   method = "lda", 
+                   data = orthopedic_training)
+
+#calculate accuracy of model
+confusionMatrix(predict(train_lda, orthopedic_test),
+                orthopedic_test$class)$overall["Accuracy"]
+```
+This model gave an accuracy of approximately 75.27%. The results were examined more closely by plotting the true ratings and the predicted ratings. For the purposes of simplicity, the pelvic tilt was plotted against the pelvic incidence of each patient. <br />
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+##########################################################
+# LDA - Bone Class Plots
+##########################################################
+lda_df <-  orthopedic_test %>% mutate(predictions = predict(train_lda, orthopedic_test,
+                                                             predict_correct = class==predictions))
+
+#generate graph for true bone classes
+actual_graph <- lda_df %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, fill = class, color=class)) +
+  geom_point(show.legend = FALSE, shape=21, size=3) + 
+  stat_ellipse(geom="polygon", alpha = 0.15, aes(fill = class)) +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#generate graph for predicted bone classes
+prediction_graph <- lda_df %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, color = predictions)) +
+  geom_point(show.legend = FALSE, shape=21, stroke=1.5) + 
+  stat_ellipse(geom="polygon", alpha = 0.15, aes(fill = predictions)) +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#arrange graphs in a column with one legend
+ggarrange(actual_graph,prediction_graph, 
+          nrow = 2, common.legend=TRUE, legend = "right",
+          labels = c("True Classes", "Predicted Classes"), font.label = list(size=9),
+          hjust=c(-1.00,-0.75),vjust=c(2.5,2.5)) %>% 
+  annotate_figure(top = text_grob("LDA - Comparison of True and Predicted Bone Classes", face = "bold", size = 10))
+```
+
+Most of the incorrect ratings were within the area in which the three ellipses overlap. To examine this in greater detail and more clearly, all of the correct predictions were removed from the plot.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+##########################################################
+# LDA - Bone Class Plots (Only incorrect predictions)
+##########################################################
+lda_df <-  orthopedic_test %>% mutate(predictions = predict(train_lda, orthopedic_test,
+                                                             predict_correct = class==predictions))
+#generate graph for true bone classes
+inaccurate_actual_graph <- lda_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, fill = class, color=class)) +
+  geom_point(show.legend = FALSE, shape=21, size=3) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = class))  +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#generate graph for predicted bone classes
+inaccurate_prediction_graph <- lda_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, color = predictions)) +
+  geom_point(show.legend = FALSE, shape=21, stroke=1.5) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = predictions)) +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#arrange graphs in a column with one legend
+ggarrange(inaccurate_actual_graph,inaccurate_prediction_graph, 
+          nrow = 2, common.legend=TRUE, legend = "right",
+          labels = c("True Classes", "Predicted Classes"), font.label = list(size=9),
+          hjust=c(-1.00,-0.75),vjust=c(2.5,2.5)) %>% 
+  annotate_figure(top = text_grob("LDA - Comparison of True and Predicted Bone Classes (Incorrect Predictions Only)",face = "bold", size = 10))
+```
+
+The incorrect predictions were mostly observations within areas overlapped by at least two ellipses. This is shown in greater detail in the table below: 
+<br />
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(knitr)
+require(knitr)
+df <- data.frame(table(predict(train_lda, orthopedic_test), orthopedic_test$class))
+df <- df[c(2,1,3)]
+colnames(df) <- c("True Bone Class", "Predicted Bone Class", "Freq")
+df <- df[-c(1,5,9), ]
+rownames(df) <- NULL
+df <- df %>% arrange(desc(Freq))
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Inaccurate Predictions of Bone Class - LDA") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+From this table, it can be concluded that within the incorrect predictions, it is relatively common for a patient to be identified as either **Normal** or **Hernia** regardless of their true bone class. It is less common for any patient to be identified under the **Spondylolisthesis** bone class. 
+
+<br />
+
+
+### 3.2.2 - Regularized Discriminant Analysis (RDA)
+RDA is defined as being "a generalization of LDA and QDA (Quadratic Discriminant Analysis).^[Rapidminer (2020), Regularized Discriminant Analysis. https://docs.rapidminer.com/latest/studio/operators/modeling/predictive/discriminant_analysis/regularized_discriminant_analysis.html#:~:text=Synopsis,descriptive%20or%20a%20predictive%20objective.]
+
+<br />
+
+The accuracy of the RDA algorithm was assessed as shown below:
+```{r, warning=FALSE, message=FALSE}
+##########################################################
+# RDA
+##########################################################
+set.seed(28, sample.kind="Rounding")
+
+#running the RDA algorithm (with tuning) on training set
+train_rda <- train(class ~ ., 
+                   method = "rda", 
+                   data = orthopedic_training)
+
+#running the trained algorithm on the test set
+confusionMatrix(predict(train_rda, orthopedic_test), 
+                orthopedic_test$class)$overall["Accuracy"]
+```
+This model gave an accuracy of approximately 83.87%. The true ratings were plotted against the predicted ratings for visual interpretation. <br />
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+##########################################################
+# RDA - Bone Class Plots (Only incorrect predictions)
+##########################################################
+rda_df <-  orthopedic_test %>% mutate(predictions = predict(train_rda, orthopedic_test,
+                                                             predict_correct = class==predictions))
+#generate graph for true bone classes
+inaccurate_actual_graph <- rda_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, fill = class, color=class)) +
+  geom_point(show.legend = FALSE, shape=21, size=3) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = class))  +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#generate graph for predicted bone classes
+inaccurate_prediction_graph <- rda_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, color = predictions)) +
+  geom_point(show.legend = FALSE, shape=21, stroke=1.5) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = predictions)) +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#arrange graphs in a column with one legend
+ggarrange(inaccurate_actual_graph,inaccurate_prediction_graph, 
+          nrow = 2, common.legend=TRUE, legend = "right",
+          labels = c("True Classes", "Predicted Classes"), font.label = list(size=9),
+          hjust=c(-1.00,-0.75),vjust=c(2.5,2.5)) %>% 
+  annotate_figure(top = text_grob("RDA - Comparison of True and Predicted Bone Classes (Incorrect Predictions Only)",face = "bold", size = 10))
+```
+
+<br />
+
+<!-- Generate table comparing true bone classes and predicted bone classes -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+library(knitr)
+require(knitr)
+df <- data.frame(table(predict(train_rda, orthopedic_test), orthopedic_test$class))
+df <- df[c(2,1,3)]
+colnames(df) <- c("True Bone Class", "Predicted Bone Class", "Freq")
+df <- df[-c(1,5,9), ]
+rownames(df) <- NULL
+df <- df %>% arrange(desc(Freq))
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Inaccurate Predictions of Bone Class - RDA") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+
+```
+
+<br />
+\newpage
+From this table it can be concluded that, within the incorrect predictions, it is relatively common for a patient to be identified as either **Normal** or **Hernia** regardless of their true bone class. In addition, no patients were misidentified as being under the *Spondylolisthesis* bone class, and only three patients beloninging to the **Spondylolisthesis** bone class were misidentifed as belonging to another bone class. 
+
+<br />
+\newpage
+
+### 3.2.3 - K-Nearest Neighbors (KNN)
+The KNN method works by assuming that observations with similar characteristics, are relatively closer to each other compared to observations with different characteristics.^[Srivastava, T. (2018), Introduction to k-Nearest Neighbors: A powerful Machine Learning Algorithm (with implementation in Python & R). https://www.analyticsvidhya.com/blog/2018/03/introduction-k-neighbours-algorithm-clustering/] This is executed using the following steps:
+
+1. Select a k-value (i.e.: the number of desired groups to classify all of observations under).
+
+2. Calculate the distance between each observation in the test, with each observation in the training set.
+
+3. Get top k rows from the sorted array.
+
+4. Get the most frequent class of these rows
+
+5. Return the predicted class
+
+The goal of the KNN method is to essentially, group observations of similar characteristics together (based on distance), and to use that to predict the class.
+
+<br />
+
+The accuracy of the KNN algorithm was assessed as shown below:
+```{r, warning=FALSE, message=FALSE}
+##########################################################
+# KNN
+##########################################################
+set.seed(28, sample.kind="Rounding")
+
+#running the KNN algorithm (with tuning) on training set
+train_knn <- train(class ~ ., 
+                   method = "knn", 
+                   data = orthopedic_training)
+
+#running the trained algorithm on the test set
+confusionMatrix(predict(train_knn, orthopedic_test), 
+                orthopedic_test$class)$overall["Accuracy"]
+```
+This model gave an accuracy of approximately 78.49%. The true ratings were plotted against the predicted ratings for visual interpretation. <br />
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+##########################################################
+# KNN - Bone Class Plots (Only incorrect predictions)
+##########################################################
+knn_df <-  orthopedic_test %>% mutate(predictions = predict(train_knn, orthopedic_test,
+                                                             predict_correct = class==predictions))
+#generate graph for true bone classes
+inaccurate_actual_graph <- knn_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, fill = class, color=class)) +
+  geom_point(show.legend = FALSE, shape=21, size=3) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = class))  +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#generate graph for predicted bone classes
+inaccurate_prediction_graph <- knn_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, color = predictions)) +
+  geom_point(show.legend = FALSE, shape=21, stroke=1.5) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = predictions)) +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#arrange graphs in a column with one legend
+ggarrange(inaccurate_actual_graph,inaccurate_prediction_graph, 
+          nrow = 2, common.legend=TRUE, legend = "right",
+          labels = c("True Classes", "Predicted Classes"), font.label = list(size=9),
+          hjust=c(-1.00,-0.75),vjust=c(2.5,2.5)) %>% 
+  annotate_figure(top = text_grob("KNN - Comparison of True and Predicted Bone Classes (Incorrect Predictions Only)",face = "bold", size = 10))
+```
+
+<br/>
+
+<!-- Generate table comparing true bone classes and predicted bone classes -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(knitr)
+require(knitr)
+df <- data.frame(table(predict(train_knn, orthopedic_test), orthopedic_test$class))
+df <- df[c(2,1,3)]
+colnames(df) <- c("True Bone Class", "Predicted Bone Class", "Freq")
+df <- df[-c(1,5,9), ]
+rownames(df) <- NULL
+df <- df %>% arrange(desc(Freq))
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Inaccurate Predictions of Bone Class - KNN") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+From this table it can be concluded that within the incorrect predictions, it appears that the **Hernia** bone class was incorrectly identified as a different class most frequently. In fact the number of times that a patient with the **Hernia** bone class was identified, outnumbers all other misidentifications by 50%. Compared to the LDA prediction algorithm, **Spondylolisthesis** was misidentified significantly less frequently compared to the other two bone classes. 
+<br />
+<br />
+\newpage
+
+### 3.2.4 - K-Nearest Neighbors Tuned (KNN)
+By default, the knn method in R only uses "5, 7, 9" as its k-values when predicting. By modifying the code, it is possible to examine a wider variety of k-values. In this way, it is possible to examine whether or not a larger k-value will result in higher prediction scores.
+
+<br />
+
+The accuracy of the tuned KNN algorithm was assessed as shown below:
+
+```{r, warning=FALSE, message=FALSE}
+##########################################################
+# KNN_Tuned
+##########################################################
+set.seed(28, sample.kind="Rounding")
+
+#running the KNN algorithm (with tuning) on training set
+train_knn2 <- train(class ~ ., 
+                   method = "knn", 
+                   data = orthopedic_training,
+                   tuneGrid = data.frame(k=seq(3,51,2)))
+
+#running the trained algorithm on the test set
+confusionMatrix(predict(train_knn2, orthopedic_test), orthopedic_test$class)$overall["Accuracy"]
+```
+
+This model gave an accuracy of approximately 82.79%. This demonstrates that there was a better k-value which could have been used to help predict the bone classes. The true ratings were plotted against the predicted ratings for visual interpretation. <br />
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+##########################################################
+# KNN_Tuned - Bone Class Plots (Only incorrect predictions)
+##########################################################
+knn2_df <-  orthopedic_test %>% mutate(predictions = predict(train_knn2, orthopedic_test,
+                                                             predict_correct = class==predictions))
+#generate graph for true bone classes
+inaccurate_actual_graph <- knn2_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, fill = class, color=class)) +
+  geom_point(show.legend = FALSE, shape=21, size=3) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = class))  +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#generate graph for predicted bone classes
+inaccurate_prediction_graph <- knn2_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, color = predictions)) +
+  geom_point(show.legend = FALSE, shape=21, stroke=1.5) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = predictions)) +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#arrange graphs in a column with one legend
+ggarrange(inaccurate_actual_graph,inaccurate_prediction_graph, 
+          nrow = 2, common.legend=TRUE, legend = "right",
+          labels = c("True Classes", "Predicted Classes"), font.label = list(size=9),
+          hjust=c(-1.00,-0.75),vjust=c(2.5,2.5)) %>% 
+  annotate_figure(top = text_grob("KNN_Tuned - Comparison of True and Predicted Bone Classes (Incorrect Predictions Only)",face = "bold", size = 10))
+```
+
+<br />
+
+<!-- Generate table comparing true bone classes and predicted bone classes -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(knitr)
+require(knitr)
+df <- data.frame(table(predict(train_knn2, orthopedic_test), orthopedic_test$class))
+df <- df[c(2,1,3)]
+colnames(df) <- c("True Bone Class", "Predicted Bone Class", "Freq")
+df <- df[-c(1,5,9), ]
+rownames(df) <- NULL
+df <- df %>% arrange(desc(Freq))
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Inaccurate Predictions of Bone Class - KNN (Tuned)") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+As for the three previous models, the **Normal** and **Hernia** bone classes are misidentified as each other more frequently than other classes. It may be noted that the **Spondylolisthesis** bone class was misidentified only three times, and that no patient was misidentified as belonging to the **Spondylolisthesis** bone class.
+
+<br />
+<br />
+
+
+\newpage
+### 3.2.5 - Decision Trees
+A decision tree algorithm attempts to group a set of data into smaller subgroups, based on a single constant for each observation within the subgroup.^[University of Cincinnati (2018), Regression Trees. https://uc-r.github.io/regression_trees] This is done through "successful binary partitions", based on the different predictors. The process of generating a decision tree model is as follows:
+
+1. Beginning with the dataset, the algorithm attempts to find the predictor and split value that partitions the data into two regions, "such that the overall sums of square error is minimized".
+2. Repeat the splitting process on each of the two regions until some stopping criterion has been achieved.
+3. To prevent overfitting, prune the most recent model to help it adjust to new, unseen data.
+
+Via this iterative procedure, the final decision tree model may be able to provide reasonably accurate predictions, while also being able to cope with the introduction of new, unseen data.
+
+<br />
+
+The accuracy of the Decision Tree algorithm was assessed as shown below:
+
+```{r, warning=FALSE, message=FALSE}
+##########################################################
+# Decision Trees
+##########################################################
+set.seed(28, sample.kind="Rounding")
+
+#running the Decision Tree algorithm on training set
+train_rpart <- train(class ~ .,
+                     method = "rpart",
+                     data = orthopedic_training)
+
+#running the trained algorithm on the test set
+confusionMatrix(predict(train_rpart, orthopedic_test), 
+                orthopedic_test$class)$overall["Accuracy"]
+```
+
+This model gave an accuracy of approximately 74.19%, a lower value than all other algorithms used so far. To gain some insight into the result, the final decision tree model was examined. 
+
+```{r, warning=FALSE, message=FALSE}
+##########################################################
+# Decision Tree Plot
+##########################################################
+par(xpd = NA)
+plot(train_rpart[11]$finalModel)
+text(train_rpart[11]$finalModel, digits=55)
+```
+
+The decision tree appears to be a very simple structure, with only four branches. This plot explains that if any given observation has a value of greater than 15.15 for **degree_spondylolisthesis**, the predicted bone class will be **Spondylolisthesis**. Otherwise, the value for sacral_scope is examined: observations with a value greater than or equal to 33.2 are classified as **Normal**, while observations with a value less than 33.2 are classified as **Hernia**.
+
+The true ratings were plotted against the predicted ratings for visual interpretation. <br />
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+##########################################################
+# Decision Trees - Bone Class Plots (Only incorrect predictions)
+##########################################################
+rpart_df <-  orthopedic_test %>% mutate(predictions = predict(train_rpart, orthopedic_test,
+                                                             predict_correct = class==predictions))
+#generate graph for true bone classes
+inaccurate_actual_graph <- rpart_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, fill = class, color=class)) +
+  geom_point(show.legend = FALSE, shape=21, size=3) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = class))  +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#generate graph for predicted bone classes
+inaccurate_prediction_graph <- rpart_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, color = predictions)) +
+  geom_point(show.legend = FALSE, shape=21, stroke=1.5) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = predictions)) +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#arrange graphs in a column with one legend
+ggarrange(inaccurate_actual_graph,inaccurate_prediction_graph, 
+          nrow = 2, common.legend=TRUE, legend = "right",
+          labels = c("True Classes", "Predicted Classes"), font.label = list(size=9),
+          hjust=c(-1.00,-0.75),vjust=c(2.5,2.5)) %>% 
+  annotate_figure(top = text_grob("Decision Trees - Comparison of True and Predicted Bone Classes (Incorrect Predictions Only)",face = "bold", size = 10))
+```
+
+<br />
+
+<!-- Generate table comparing true bone classes and predicted bone classes -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(knitr)
+require(knitr)
+df <- data.frame(table(predict(train_rpart, orthopedic_test), orthopedic_test$class))
+df <- df[c(2,1,3)]
+colnames(df) <- c("True Bone Class", "Predicted Bone Class", "Freq")
+df <- df[-c(1,5,9), ]
+rownames(df) <- NULL
+df <- df %>% arrange(desc(Freq))
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Inaccurate Predictions of Bone Class - Decision Trees") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+As for the four previous prediction models, the **Normal** and **Hernia** bone classes are misidentified as each other more frequently than other classes. It may be noted that the **Spondylolisthesis** bone class was misidentified only two times, and that no patient was misidentified as being under the **Spondylolisthesis** bone class.
+
+<br />
+<br />
+
+\newpage
+### 3.2.6 - Random Forests
+Random forests operate on the same basic principle as regression trees. The main difference is that random forests attempts to reduce variance by minimizing the amount of correlation between the different regression trees which are generated.^[University of Cincinnati (2018), Random Forests. https://uc-r.github.io/random_forests#idea]
+
+<br />
+
+The accuracy of the Random Forest algorithm was assessed as shown below:
+
+```{r, warning=FALSE, message=FALSE}
+##########################################################
+# Random Forests
+##########################################################
+set.seed(28, sample.kind="Rounding")
+
+#running the Random Forests algorithm on training set
+train_rf1 <- train(class ~ .,
+                   method = "rf",
+                   data = orthopedic_training)
+
+#running the trained algorithm on the test set
+confusionMatrix(predict(train_rf1, orthopedic_test), 
+                orthopedic_test$class)$overall["Accuracy"]
+```
+
+This model gave an accuracy of approximately 81.72%. The true ratings were plotted against the predicted ratings for visual interpretation. <br />
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+##########################################################
+# Decision Trees - Bone Class Plots (Only incorrect predictions)
+##########################################################
+rf1_df <-  orthopedic_test %>% mutate(predictions = predict(train_rf1, orthopedic_test,
+                                                             predict_correct = class==predictions))
+#generate graph for true bone classes
+inaccurate_actual_graph <- rf1_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, fill = class, color=class)) +
+  geom_point(show.legend = FALSE, shape=21, size=3) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = class))  +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#generate graph for predicted bone classes
+inaccurate_prediction_graph <- rf1_df %>%
+  mutate(predict_correct = class==predictions) %>% 
+  filter(predict_correct == FALSE) %>%
+  ggplot(aes(pelvic_incidence, pelvic_tilt, color = predictions)) +
+  geom_point(show.legend = FALSE, shape=21, stroke=1.5) + 
+  stat_ellipse(data=(lda_df), geom="polygon", alpha = 0.15, aes(fill = predictions)) +
+  scale_x_continuous(breaks=seq(0, 150, 25),limits=c(0,125)) +
+  scale_y_continuous(breaks=seq(0, 60, 10),limits=c(-9,55)) +
+  labs(x = "Pelvic Incidence", y = "Pelvic Tilt")
+
+#arrange graphs in a column with one legend
+ggarrange(inaccurate_actual_graph,inaccurate_prediction_graph, 
+          nrow = 2, common.legend=TRUE, legend = "right",
+          labels = c("True Classes", "Predicted Classes"), font.label = list(size=9),
+          hjust=c(-1.00,-0.75),vjust=c(2.5,2.5)) %>% 
+  annotate_figure(top = text_grob("Random Forests - Comparison of True and Predicted Bone Classes (Incorrect Predictions Only)",face = "bold", size = 10))
+```
+
+<br />
+
+<!-- Generate table comparing true bone classes and predicted bone classes -->
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(knitr)
+require(knitr)
+df <- data.frame(table(predict(train_rf1, orthopedic_test), orthopedic_test$class))
+df <- df[c(2,1,3)]
+colnames(df) <- c("True Bone Class", "Predicted Bone Class", "Freq")
+df <- df[-c(1,5,9), ]
+rownames(df) <- NULL
+df <- df %>% arrange(desc(Freq))
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Inaccurate Predictions of Bone Class - Random Forests") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+As for the five previous prediction models, the **Normal** and **Hernia** bone classes are misidentified as each other more frequently than other classes. It may be noted that the **Spondylolisthesis** bone class was misidentified only two times, and that only one patient was misidentified as being under the **Spondylolisthesis** bone class.
+
+<br />
+<br />
+
+
+\newpage
+### 3.3 - Prediction Model Summaries
+
+As predicted, the **Hernia** and **Normal** bone classes were misidentified as each other more frequently than all other misidentifications. In addition, patients with the **Spondlolisthesis** bone class were misidentified significantly less frequently than the other two classes. Patients also tended to be misidentied as being in the **Spondylolisthesis** bone class less frequently, compared to patients in the other two bone classes.
+
+<!-- Generate table comparing the different prediction algorithms -->
+```{r, echo=FALSE}
+library(knitr)
+require(knitr)
+df <- data.frame("Prediction Models" = c("Linear Discriminite Analysis (LDA)",
+                                         "Regularized Discriminite Analysis (RDA)",
+                                         "K-Nearest Neighbors (KNN)",
+                                         "K-Nearest Neighbors (KNN) - Tuned",
+                                         "Decision Trees",
+                                         "Random Forests"),
+           "Accuracy" = c("75.27%", "83.87%", "78.49%", "82.79%", "74.19%", "81.72%"))
+
+kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T, 
+    caption = "Accuracy of Prediction Models") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+<br />
+As seen in the table above, the model that produced the most accurate results was the RDA algorithm. Other accurate models were the KNN algorithm (after tuning), and the Random Forests algorithm. However, it is important to note that all of the prediction algorithms produced accuracies that are relatively close to each other. Only a single algorithm (the Decision Trees algorithm) produced an accuracy of less than 75%, specifically 74.19%. Thus, all of these algorithms were able to predict the bone class of the patients with reasonable accuracy.
+
+<br />
+<br />
+
+
+\newpage
+## 4. Conclusion
+### 4.1 - Brief Summary of Report  
+
+Examination of the graphs promoted the observation that, it was observed that the interquartile ranges of the **Normal** and **Hernia** bone classes overlap each other to a greater degree than either does with the **Spondlolisthesis** bone class. It was hypothesized that this would result in the two bone classes being misidentified as the other more frequently than either of them was misidentified **Spondlolisthesis** bone class. This was supported by examination of the incorrect prediction tables for each algorithm.
+
+The prediction model that had the highest accuracy scores also tended to be the ones that were more complex, while simpler algorithms produced slightly lower accuracies. 
+
+<br />
+
+### 4.2 - Limitations
+
+This project is limited in terms of the number of observations available for analysis: 217 observations for the training set and 93 for the test set (for a combined total of 310 observations). 
+
+The small number of observations resulted in an accuracy that is highly susceptible to the number of correct predictions by a given algorithm. More specifically, an algorithm that correctly predicts the bone class of a single extra patient will result in an increased accuracy of 1.07%.
+
+<br />
+
+### 4.3 - Future Work  
+
+A large variety of different prediction models and algorithms than the six described here exist. A larger subset of these could be trialled to see if they produce more accurate results. 
+
+In addition, it would be interesting to repeat the project using a dataset not too similar to from the one examined in this assignment, but containing a significantly greater number of observations.
+
+
