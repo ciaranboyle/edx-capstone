@@ -1,7 +1,7 @@
 ---
 title: "Orthopedic Patients Prediction Models - Report"
 author: "Ciaran Boyle"
-date: "11/05/2020"
+date: "11/06/2020"
 output:
   pdf_document:
     toc: yes
@@ -142,7 +142,7 @@ orthopedic_data <-
   read_csv(url("https://raw.githubusercontent.com/ciaranboyle/edx-capstone/main/orthopedic_data.csv"))
 ``` 
 
-The downloaded data was stored in a data table named **orthopedic_data**, and split into two separate sets of data: **orthopedic_training** and **orthopedic_test**. **Orthopedic_training** was used to develop various prediction models, which were then tested on the test **orthopedic_test**. The accuracy of each prediction model was then assessed and recorded.
+The downloaded data was stored in a data table named **orthopedic_data**, and split into two separate sets of data: **orthopedic_training** and **orthopedic_test**. **Orthopedic_training** was used to develop various prediction models, which were then tested on **orthopedic_test**. The accuracy of each prediction model was then assessed and recorded.
 
 <!-- Code chunk: for generating test and training sets -->
 ```{r, eval=FALSE}
@@ -160,7 +160,7 @@ orthopedic_test <- orthopedic_data[-partition_index,]
 rm(partition_index)
 ```
 
-A 70%/30% training/test split was chosen, due to it being considered the standard for algorithm training.
+A 70%/30% training/test split was chosen, due to this proportion being considered the standard for algorithm training.
 
 <br />
 
@@ -380,7 +380,7 @@ df
 
 <br />
 
-As for the previous feature, the lower and upper limits appear to be very similar for both **Normal** and **Hernia**, while **Spondylolisthesis** has a significantly wider range. However, the upper limits for the **Normal** bone class appear to be higher compared to **Hernia**. In addition, the median for the **Normal** bone class appears to be slightly higher than the median for **Hernia**, 
+As for the previous feature, the lower and upper limits appear to be very similar for both **Normal** and **Hernia**, while **Spondylolisthesis** has a significantly wider range. However, the upper limits for the **Normal** bone class appear to be higher compared to **Hernia**. In addition, the median for the **Normal** bone class appears to be slightly higher than the median for **Hernia**. 
 <br />
 
 ### 2.2.7 - Distribution of Degree spondylolisthesis per patient
@@ -430,11 +430,11 @@ Once the data was examined, modelling & optimization of the model began. The acc
 <br />
 
 ### 3.2 - Prediction Models
-A large variety of different prediction models were created. The first of which was relatively simple, with the subsequent models becoming increasingly complex
+A large variety of different prediction models were created. The first of which was relatively simple, with the subsequent models becoming increasingly complex.
 <br />
 
 ### 3.2.1 - Linear Discriminant Analysis (LDA)
-The main goal of LDA is to "project the features in a higher dimension space onto a lower dimension space". This was achieved in three steps:^[Sawla, S. (2018), Linear Discriminant Analysis. https://medium.com/@srishtisawla/linear-discriminant-analysis-d38decf48105]
+The main goal of LDA is to "project the features in a higher dimension space onto a lower dimension space".^[Sawla, S. (2018), Linear Discriminant Analysis. https://medium.com/@srishtisawla/linear-discriminant-analysis-d38decf48105] This was achieved in three steps:
 
 
 1. The first step is to calculate the between-class variance (i.e.: the distance between the mean of different classes).
@@ -638,7 +638,7 @@ kbl(df, col.names =  gsub("[.]", " ", names(df)), booktabs = T,
 
 <br />
 \newpage
-From this table it can be concluded that, within the incorrect predictions, it is relatively common for a patient to be identified as either **Normal** or **Hernia** regardless of their true bone class. In addition, no patients were misidentified as being under the *Spondylolisthesis* bone class, and only three patients beloninging to the **Spondylolisthesis** bone class were misidentifed as belonging to another bone class. 
+From this table it can be concluded that, within the incorrect predictions, it is relatively common for a patient to be identified as either **Normal** or **Hernia** regardless of their true bone class. In addition, no patients were misidentified as being under the **Spondylolisthesis** bone class, and only three patients beloninging to the **Spondylolisthesis** bone class were misidentifed as belonging to another bone class. 
 
 <br />
 \newpage
@@ -863,7 +863,7 @@ plot(train_rpart[11]$finalModel)
 text(train_rpart[11]$finalModel, digits=55)
 ```
 
-The decision tree appears to be a very simple structure, with only four branches. This plot explains that if any given observation has a value of greater than 15.15 for **degree_spondylolisthesis**, the predicted bone class will be **Spondylolisthesis**. Otherwise, the value for sacral_scope is examined: observations with a value greater than or equal to 33.2 are classified as **Normal**, while observations with a value less than 33.2 are classified as **Hernia**.
+The decision tree appears to be a very simple structure, with only four branches. This plot explains that if any given observation has a value of greater than 15.15 for **degree_spondylolisthesis**, the predicted bone class will be **Spondylolisthesis**. Otherwise, the value for **sacral_scope** is examined: observations with a value greater than or equal to 33.2 are classified as **Normal**, while observations with a value less than 33.2 are classified as **Hernia**.
 
 The true ratings were plotted against the predicted ratings for visual interpretation. <br />
 
@@ -1045,7 +1045,7 @@ As seen in the table above, the model that produced the most accurate results wa
 ## 4. Conclusion
 ### 4.1 - Brief Summary of Report  
 
-Examination of the graphs promoted the observation that, it was observed that the interquartile ranges of the **Normal** and **Hernia** bone classes overlap each other to a greater degree than either does with the **Spondlolisthesis** bone class. It was hypothesized that this would result in the two bone classes being misidentified as the other more frequently than either of them was misidentified **Spondlolisthesis** bone class. This was supported by examination of the incorrect prediction tables for each algorithm.
+Examination of the graphs promoted the observation that, it was observed that the interquartile ranges of the **Normal** and **Hernia** bone classes overlap each other to a greater degree than either does with the **Spondlolisthesis** bone class. It was hypothesized that this would result in the two bone classes being misidentified as each other more frequently than either of them was misidentified **Spondlolisthesis** bone class. This was supported by examination of the incorrect prediction tables for each algorithm.
 
 The prediction model that had the highest accuracy scores also tended to be the ones that were more complex, while simpler algorithms produced slightly lower accuracies. 
 
