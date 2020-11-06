@@ -1,5 +1,5 @@
 ---
-title: "Orthopedic Patients Prediction Models - Report"
+title: "The Application of Prediction Models on Biomechanical Features of Orthopedic Patients - Report"
 author: "Ciaran Boyle"
 date: "11/06/2020"
 output:
