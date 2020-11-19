@@ -4,23 +4,23 @@ This is the project folder for the Capstone assignment. This assignment was comp
 The files included in the folder are:
 ### [Prediction_Model_Code.R](Prediction_Model_Code.R)
 Contains the code used to download the dataset, as well as the prediction models that were developed during the course of this assignment.
-\\
+\
 
 ### [Report.pdf](Report.pdf)
 Contains the findings for the assignment presented in pdf format.
-\\
+\
 
 ### [Report_Code.Rmd](Report_Code.Rmd)
 Contains the code used to generate the pdf report.
-\\
+\
 
 ### [REPORT_WORKPLACE 20201103 01.RData](https://github.com/ciaranboyle/edx-capstone/blob/main/REPORT_WORKPLACE%2020201103%2001.RData)
 Contains various dataframes and lists used to help generate the pdf report. 
-\\
+\
 
 ### [orthopedic_data.csv](orthopedic_data.csv)
 Contains the data that was examined in the report.
-\\
+\
 
 ### [README.md](README.md)
 Readme file for this folder.
